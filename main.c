@@ -41,15 +41,19 @@
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
-volatile uint8_t semaphore_flag = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -89,21 +93,51 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  // Pastikan PA0 pakai Pull-up dan EXTI0 aktif di Falling Edge (tombol ke GND)
-  GPIOA->PUPDR &= ~(3U << 0);
-  GPIOA->PUPDR |=  (1U << 0);
+  // 1. Aktifkan clock GPIOA, GPIOB, TIM2, TIM3, TIM4
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
 
-  EXTI->RTSR &= ~(1U << 0);
-  EXTI->FTSR |=  (1U << 0);
-  EXTI->PR    =  (1U << 0);
-  EXTI->IMR  |=  (1U << 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  // 2. Konfigurasi PA5 (LED Kuning - Output -> bit 11:10 di MODER)
+  GPIOA->MODER &= ~(3U << 10);
+  GPIOA->MODER |=  (1U << 10);
 
-  // Aktifkan update interrupt TIM2
-  TIM2->SR   &= ~TIM_SR_UIF;
-  TIM2->DIER |=  TIM_DIER_UIE;
+  // 3. Konfigurasi PA0 (LED Hijau - Output -> bit 1:0 di MODER)
+  GPIOA->MODER &= ~(3U << 0);
+  GPIOA->MODER |=  (1U << 0);
+
+  // 4. Konfigurasi PB5 (LED Merah - Output -> bit 11:10 di MODER)
+  GPIOB->MODER &= ~(3U << 10);
+  GPIOB->MODER |=  (1U << 10);
+
+  // 5. Konfigurasi TIM3
+  TIM3->PSC = 7999;
+  TIM3->ARR = 499;
+  TIM3->SR  &= ~TIM_SR_UIF;
+  TIM3->DIER |= TIM_DIER_UIE;
+  TIM3->CR1  |= TIM_CR1_CEN;
+  HAL_NVIC_EnableIRQ(TIM3_IRQn);
+
+  // 6. Konfigurasi TIM2
+  TIM2->PSC = 31999;
+  TIM2->ARR = 249;
+  TIM2->SR  &= ~TIM_SR_UIF;
+  TIM2->DIER |= TIM_DIER_UIE;
+  TIM2->CR1  |= TIM_CR1_CEN;
   HAL_NVIC_EnableIRQ(TIM2_IRQn);
+
+  // 7. Konfigurasi TIM4
+  TIM4->PSC = 1599;
+  TIM4->ARR = 999;
+  TIM4->SR  &= ~TIM_SR_UIF;
+  TIM4->DIER |= TIM_DIER_UIE;
+  TIM4->CR1  |= TIM_CR1_CEN;
+  HAL_NVIC_EnableIRQ(TIM4_IRQn);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,11 +147,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if (semaphore_flag == 1)
-    {
-      semaphore_flag = 0;
-      GPIOC->ODR ^= (1U << 13);
-    }
   }
   /* USER CODE END 3 */
 }
@@ -182,9 +211,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 3999;
+  htim2.Init.Prescaler = 31999;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 179;
+  htim2.Init.Period = 249;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -209,6 +238,96 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 7999;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 999;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 1599;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 999;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -218,96 +337,4 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
-  /* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : PC13 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
-
-  /* USER CODE BEGIN MX_GPIO_Init_2 */
-
-  /* USER CODE END MX_GPIO_Init_2 */
-}
-
-/* USER CODE BEGIN 4 */
-void EXTI0_IRQHandler(void)
-{
-  if (EXTI->PR & (1U << 0))
-  {
-    EXTI->PR  |=  (1U << 0);        // Reset pending flag EXTI0
-    EXTI->IMR &= ~(1U << 0);        // Matikan sementara EXTI0 (abaikan bouncing)
-
-    TIM2->CNT = 0;                  // Reset hitungan timer
-    TIM2->CR1 |= TIM_CR1_CEN;       // Mulai timer debounce
-  }
-}
-
-void TIM2_IRQHandler(void)
-{
-  if (TIM2->SR & TIM_SR_UIF)
-  {
-    TIM2->SR  &= ~TIM_SR_UIF;       // Reset flag UIF
-    TIM2->CR1 &= ~TIM_CR1_CEN;      // Hentikan TIM2
-
-    // Pastikan tombol PA0 masih ditekan (logika 0 ke GND)
-    if ((GPIOA->IDR & (1U << 0)) == 0)
-    {
-      semaphore_flag = 1;         // Kirim sinyal semaphore ke main loop
-    }
-
-    EXTI->PR  |= (1U << 0);         // Bersihkan sisa pending flag
-    EXTI->IMR |= (1U << 0);         // Aktifkan kembali interupsi EXTI0
-  }
-}
-/* USER CODE END 4 */
-
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
-}
-#ifdef USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
-}
-#endif /* USE_FULL_ASSERT */
+  /* USER CODE END MX_GPIO_Init
